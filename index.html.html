@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Multi-Currency Gold Price Calculator</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- SheetJS for client-side Excel generation -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen">
+    <div class="max-w-6xl mx-auto px-4 py-8">
+        <!-- Header -->
+        <header class="mb-8 flex flex-col md:flex-row md:items-center md:justify-between gap-4 border-b border-slate-200 pb-6">
+            <div>
+                <div class="flex items-center gap-2 text-amber-600 font-semibold text-sm uppercase tracking-wider mb-1">
+                    <i data-lucide="gem" class="w-4 h-4"></i>
+                    Multi-Currency Gold Suite
+                </div>
+                <h1 class="text-3xl font-extrabold text-slate-900 tracking-tight">Dynamic Gold Price Calculator</h1>
+                <p class="text-slate-500 mt-1">Convert spot gold across global currency pairs into local KSA retail rates & traditional units (Bhori/Ana).</p>
+            </div>
+            <div>
+                <button onclick="exportToExcel()" class="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-5 py-3 rounded-xl transition shadow-md shadow-emerald-600/10 hover:shadow-emerald-600/20 active:scale-[0.98]">
+                    <i data-lucide="file-spreadsheet" class="w-5 h-5"></i>
+                    Download Excel (.xlsx)
+                </button>
+            </div>
+        </header>
+
+        <!-- Main Grid Layout -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+            
+            <!-- Left Side: Inputs Panel (4 cols) -->
+            <section class="lg:col-span-4 space-y-6">
+                <!-- Currency Selector Module -->
+                <div class="bg-gradient-to-br from-amber-500 to-amber-600 text-white rounded-2xl p-5 shadow-sm space-y-4">
+                    <div class="flex items-center justify-between font-bold text-base">
+                        <div class="flex items-center gap-2">
+                            <i data-lucide="coins" class="w-5 h-5 text-amber-100"></i>
+                            Currency Pair Settings
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-3">
+                        <!-- Spot Base Currency -->
+                        <div>
+                            <label class="block text-[10px] font-bold uppercase tracking-wider text-amber-100 mb-1">Gold Base Currency</label>
+                            <select id="baseCurrency" onchange="fetchLiveMarketData()" class="block w-full px-2.5 py-2 bg-amber-700/50 border border-amber-300/30 rounded-lg text-white font-bold text-sm focus:ring-2 focus:ring-white outline-none cursor-pointer">
+                                <option value="USD" selected>USD ($)</option>
+                                <option value="EUR">EUR (€)</option>
+                                <option value="GBP">GBP (£)</option>
+                                <option value="AED">AED (AED)</option>
+                                <option value="SAR">SAR (SR)</option>
+                            </select>
+                        </div>
+
+                        <!-- Target Reference Currency -->
+                        <div>
+                            <label class="block text-[10px] font-bold uppercase tracking-wider text-amber-100 mb-1">Reference Foreign FX</label>
+                            <select id="targetCurrency" onchange="fetchLiveMarketData()" class="block w-full px-2.5 py-2 bg-amber-700/50 border border-amber-300/30 rounded-lg text-white font-bold text-sm focus:ring-2 focus:ring-white outline-none cursor-pointer">
+                                <option value="BDT" selected>BDT (৳)</option>
+                                <option value="INR">INR (₹)</option>
+                                <option value="PKR">PKR (Rs)</option>
+                                <option value="PHP">PHP (₱)</option>
+                                <option value="USD">USD ($)</option>
+                                <option value="EUR">EUR (€)</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
+                    <div class="flex items-center justify-between font-bold text-slate-900 text-lg mb-4">
+                        <div class="flex items-center gap-2">
+                            <i data-lucide="sliders" class="text-slate-500 w-5 h-5"></i>
+                            Market Inputs
+                        </div>
+                        <button onclick="fetchLiveMarketData()" id="fetchBtn" class="inline-flex items-center gap-1 text-xs font-semibold bg-amber-500 hover:bg-amber-600 text-white px-2.5 py-1.5 rounded-lg transition active:scale-95">
+                            <i data-lucide="refresh-cw" class="w-3.5 h-3.5" id="refreshIcon"></i>
+                            Refresh Live
+                        </button>
+                    </div>
+                    
+                    <div class="space-y-4">
+                        <!-- Spot Price Base Currency -->
+                        <div>
+                            <div class="flex items-center justify-between mb-1">
+                                <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500" id="spotLabel">Spot Gold Price (USD / oz)</label>
+                                <span id="goldBadge" class="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">● Live Data</span>
+                            </div>
+                            <div class="relative rounded-lg shadow-sm mb-1.5">
+                                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                    <span class="text-slate-400 font-medium" id="spotSymbol">$</span>
+                                </div>
+                                <input type="number" id="spotPrice" value="4124.96" step="0.01" oninput="calculateAll()" class="block w-full pl-8 pr-3 py-2.5 bg-slate-50 hover:bg-slate-100/50 focus:bg-white border border-slate-200 rounded-lg text-slate-900 font-bold focus:ring-2 focus:ring-amber-500 focus:border-amber-500 transition outline-none">
+                            </div>
+                            <!-- Last Updated Tag -->
+                            <div class="flex items-center gap-1 text-[11px] text-slate-400">
+                                <i data-lucide="clock" class="w-3 h-3"></i>
+                                <span>Last Updated: <strong id="lastUpdatedTag" class="text-slate-600 font-medium">--:--:--</strong></span>
+                            </div>
+                        </div>
+
+                        <!-- Base to Local SAR exchange rate -->
+                        <div>
+                            <div class="flex items-center justify-between mb-1">
+                                <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500" id="sarFxLabel">Base to SAR Exchange Rate</label>
+                                <span id="sarFxBadge" class="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">● Live FX</span>
+                            </div>
+                            <input type="number" id="baseToSar" value="3.75" step="0.0001" oninput="calculateAll()" class="block w-full px-3 py-2.5 bg-slate-50 hover:bg-slate-100/50 focus:bg-white border border-slate-200 rounded-lg text-slate-900 font-bold focus:ring-2 focus:ring-amber-500 focus:border-amber-500 transition outline-none">
+                        </div>
+
+                        <!-- Base to Target FX exchange rate -->
+                        <div>
+                            <div class="flex items-center justify-between mb-1">
+                                <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500" id="targetFxLabel">Base to Ref FX Rate</label>
+                                <span id="targetFxBadge" class="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">● Live FX</span>
+                            </div>
+                            <input type="number" id="baseToTarget" value="123.00" step="0.01" oninput="calculateAll()" class="block w-full px-3 py-2.5 bg-slate-50 hover:bg-slate-100/50 focus:bg-white border border-slate-200 rounded-lg text-slate-900 font-bold focus:ring-2 focus:ring-amber-500 focus:border-amber-500 transition outline-none">
+                        </div>
+
+                        <!-- Making charge per gram in SAR -->
+                        <div>
+                            <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1">Making Charge per Gram (SAR)</label>
+                            <div class="relative rounded-lg shadow-sm">
+                                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                    <span class="text-slate-400 font-medium">SR</span>
+                                </div>
+                                <input type="number" id="makingCharge" value="15.00" step="1" oninput="calculateAll()" class="block w-full pl-10 pr-3 py-2.5 bg-slate-50 hover:bg-slate-100/50 focus:bg-white border border-slate-200 rounded-lg text-slate-900 font-bold focus:ring-2 focus:ring-amber-500 focus:border-amber-500 transition outline-none">
+                            </div>
+                        </div>
+
+                        <!-- Standard VAT Rate -->
+                        <div>
+                            <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1">Standard KSA VAT Rate</label>
+                            <div class="relative rounded-lg shadow-sm">
+                                <input type="number" id="vatRate" value="15" step="0.5" oninput="calculateAll()" class="block w-full pr-8 pl-3 py-2.5 bg-slate-50 hover:bg-slate-100/50 focus:bg-white border border-slate-200 rounded-lg text-slate-900 font-bold focus:ring-2 focus:ring-amber-500 focus:border-amber-500 transition outline-none">
+                                <div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                                    <span class="text-slate-400 font-medium">%</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Tourist VAT Refund factor -->
+                        <div>
+                            <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1">Tourist VAT Refund Factor</label>
+                            <div class="relative rounded-lg shadow-sm">
+                                <input type="number" id="refundRate" value="85" step="1" oninput="calculateAll()" class="block w-full pr-8 pl-3 py-2.5 bg-slate-50 hover:bg-slate-100/50 focus:bg-white border border-slate-200 rounded-lg text-slate-900 font-bold focus:ring-2 focus:ring-amber-500 focus:border-amber-500 transition outline-none">
+                                <div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                                    <span class="text-slate-400 font-medium">%</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Formula Helpers -->
+                <div class="bg-amber-50/70 border border-amber-100 rounded-2xl p-5 space-y-3">
+                    <div class="flex items-center gap-2 text-amber-800 font-bold text-sm">
+                        <i data-lucide="info" class="w-4 h-4 text-amber-600"></i>
+                        Conversion Standard Metrics
+                    </div>
+                    <ul class="text-xs text-amber-900/80 space-y-1.5 list-disc list-inside">
+                        <li>1 Bhori (Vori) = <span class="font-semibold">11.664 Grams</span></li>
+                        <li>1 Ana = <span class="font-semibold">0.729 Grams</span> (1/16 of Bhori)</li>
+                        <li>1 Troy Ounce = <span class="font-semibold">31.1035 Grams</span></li>
+                    </ul>
+                </div>
+            </section>
+
+            <!-- Right Side: Tables and Dynamic Custom Card (8 cols) -->
+            <main class="lg:col-span-8 space-y-8">
+                
+                <!-- Section 1: Standard Comparison Table -->
+                <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                    <div class="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+                        <div class="flex items-center gap-2">
+                            <span class="flex items-center justify-center w-8 h-8 bg-amber-100 text-amber-700 rounded-lg">
+                                <i data-lucide="table" class="w-4 h-4"></i>
+                            </span>
+                            <div>
+                                <h2 class="font-bold text-slate-900">Standard Retail Rates (22K vs 21K)</h2>
+                                <p class="text-xs text-slate-500">Includes live VAT comparison & direct conversion to <span class="targetCurrencyLabel">BDT</span></p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="bg-slate-100/50 text-slate-600 text-xs font-semibold border-b border-slate-200">
+                                    <th class="py-3 px-6">Gold Purity</th>
+                                    <th class="py-3 px-6">Unit Weight</th>
+                                    <th class="py-3 px-6 text-right">KSA Retail (Inc. VAT)</th>
+                                    <th class="py-3 px-6 text-right text-emerald-700 bg-emerald-50/30">Tourist Price (Net)</th>
+                                    <th class="py-3 px-6 text-right" id="targetTableHeader">Equiv. BDT (Tourist)</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-100 text-sm">
+                                <!-- 22K Bhori -->
+                                <tr class="hover:bg-slate-50/50 transition">
+                                    <td class="py-4 px-6 font-bold text-slate-900">22K Gold (91.67%)</td>
+                                    <td class="py-4 px-6 text-slate-600">1 Bhori (Vori)</td>
+                                    <td class="py-4 px-6 text-right font-semibold text-slate-900" id="std_22_bhori">-</td>
+                                    <td class="py-4 px-6 text-right font-bold text-emerald-600 bg-emerald-50/20" id="tour_22_bhori">-</td>
+                                    <td class="py-4 px-6 text-right font-medium text-slate-700" id="target_22_bhori">-</td>
+                                </tr>
+                                <!-- 22K Ana -->
+                                <tr class="hover:bg-slate-50/50 transition">
+                                    <td class="py-4 px-6 font-bold text-slate-900">22K Gold (91.67%)</td>
+                                    <td class="py-4 px-6 text-slate-600">1 Ana</td>
+                                    <td class="py-4 px-6 text-right font-semibold text-slate-900" id="std_22_ana">-</td>
+                                    <td class="py-4 px-6 text-right font-bold text-emerald-600 bg-emerald-50/20" id="tour_22_ana">-</td>
+                                    <td class="py-4 px-6 text-right font-medium text-slate-700" id="target_22_ana">-</td>
+                                </tr>
+                                <!-- 21K Bhori -->
+                                <tr class="hover:bg-slate-50/50 transition">
+                                    <td class="py-4 px-6 font-bold text-slate-900">21K Gold (87.50%)</td>
+                                    <td class="py-4 px-6 text-slate-600">1 Bhori (Vori)</td>
+                                    <td class="py-4 px-6 text-right font-semibold text-slate-900" id="std_21_bhori">-</td>
+                                    <td class="py-4 px-6 text-right font-bold text-emerald-600 bg-emerald-50/20" id="tour_21_bhori">-</td>
+                                    <td class="py-4 px-6 text-right font-medium text-slate-700" id="target_21_bhori">-</td>
+                                </tr>
+                                <!-- 21K Ana -->
+                                <tr class="hover:bg-slate-50/50 transition">
+                                    <td class="py-4 px-6 font-bold text-slate-900">21K Gold (87.50%)</td>
+                                    <td class="py-4 px-6 text-slate-600">1 Ana</td>
+                                    <td class="py-4 px-6 text-right font-semibold text-slate-900" id="std_21_ana">-</td>
+                                    <td class="py-4 px-6 text-right font-bold text-emerald-600 bg-emerald-50/20" id="tour_21_ana">-</td>
+                                    <td class="py-4 px-6 text-right font-medium text-slate-700" id="target_21_ana">-</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Section 2: Dynamic Custom Calculator Card -->
+                <div class="bg-gradient-to-r from-slate-900 to-slate-850 text-white rounded-2xl border border-slate-800 shadow-xl p-6 md:p-8 relative overflow-hidden">
+                    <div class="absolute right-0 bottom-0 translate-y-12 translate-x-12 opacity-[0.05] pointer-events-none">
+                        <i data-lucide="scale" class="w-72 h-72 text-white"></i>
+                    </div>
+                    
+                    <div class="flex items-center gap-3 mb-6">
+                        <span class="flex items-center justify-center w-10 h-10 bg-amber-500/10 text-amber-400 rounded-xl border border-amber-500/20">
+                            <i data-lucide="calculator" class="w-5 h-5"></i>
+                        </span>
+                        <div>
+                            <h2 class="font-bold text-lg text-white">Custom Weight Calculator</h2>
+                            <p class="text-xs text-slate-400">Instantly solve calculations for complex custom gold bundles</p>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
+                        <!-- Left Panel: Custom Inputs -->
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">Desired Purity</label>
+                                <select id="customPurity" onchange="calculateAll()" class="block w-full px-3 py-2.5 bg-slate-800 border border-slate-700 rounded-xl text-white font-semibold focus:ring-2 focus:ring-amber-500 outline-none transition cursor-pointer">
+                                    <option value="22" selected>22K Gold (91.67%)</option>
+                                    <option value="21">21K Gold (87.50%)</option>
+                                </select>
+                            </div>
+
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">Custom Bhori</label>
+                                    <input type="number" id="customBhori" value="1" min="0" step="0.1" oninput="calculateAll()" class="block w-full px-3 py-2.5 bg-slate-800 border border-slate-700 rounded-xl text-white font-bold text-center focus:ring-2 focus:ring-amber-500 outline-none transition">
+                                </div>
+                                <div>
+                                    <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">Custom Ana</label>
+                                    <input type="number" id="customAna" value="4" min="0" step="0.5" oninput="calculateAll()" class="block w-full px-3 py-2.5 bg-slate-800 border border-slate-700 rounded-xl text-white font-bold text-center focus:ring-2 focus:ring-amber-500 outline-none transition">
+                                </div>
+                            </div>
+
+                            <div>
+                                <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">Additional Grams (Optional)</label>
+                                <input type="number" id="customGrams" value="0" min="0" step="0.01" oninput="calculateAll()" class="block w-full px-3 py-2.5 bg-slate-800 border border-slate-700 rounded-xl text-white font-bold focus:ring-2 focus:ring-amber-500 outline-none transition">
+                            </div>
+                        </div>
+
+                        <!-- Right Panel: Outputs Display Card -->
+                        <div class="bg-slate-800/40 border border-slate-700/60 rounded-2xl p-6 space-y-4">
+                            <div>
+                                <div class="text-xs text-slate-400 font-semibold mb-1">Total Weight Equivalent</div>
+                                <div class="text-2xl font-extrabold text-amber-400" id="custom_weight_grams">0.00 g</div>
+                            </div>
+                            
+                            <hr class="border-slate-700/60">
+
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <div class="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-1">Retail (Incl. VAT)</div>
+                                    <div class="text-base font-bold text-white" id="custom_std_price">-</div>
+                                </div>
+                                <div>
+                                    <div class="text-[10px] text-emerald-400 font-bold uppercase tracking-wider mb-1">Tourist Refund (Net)</div>
+                                    <div class="text-lg font-black text-emerald-400" id="custom_tour_price">-</div>
+                                </div>
+                            </div>
+
+                            <hr class="border-slate-700/60">
+
+                            <div>
+                                <div class="text-xs text-slate-400 font-semibold mb-1" id="customTargetTitle">Equivalent Tourist Net (BDT)</div>
+                                <div class="text-xl font-bold text-slate-100" id="custom_target_price">-</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </main>
+        </div>
+    </div>
+
+    <!-- Script Block -->
+    <script>
+        const GRAMS_PER_OZ = 31.1034768;
+        const GRAMS_PER_BHORI = 11.664;
+        const ANAS_PER_BHORI = 16;
+
+        const currencySymbols = {
+            'USD': '$',
+            'EUR': '€',
+            'GBP': '£',
+            'AED': 'AED',
+            'SAR': 'SR',
+            'BDT': '৳',
+            'INR': '₹',
+            'PKR': 'Rs',
+            'PHP': '₱'
+        };
+
+        function updateTimestamp() {
+            const now = new Date();
+            const formattedTime = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            const formattedDate = now.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' });
+            document.getElementById('lastUpdatedTag').innerText = `${formattedDate} at ${formattedTime}`;
+        }
+
+        async function fetchLiveMarketData() {
+            const refreshIcon = document.getElementById('refreshIcon');
+            const goldBadge = document.getElementById('goldBadge');
+            const sarFxBadge = document.getElementById('sarFxBadge');
+            const targetFxBadge = document.getElementById('targetFxBadge');
+            
+            refreshIcon.classList.add('animate-spin');
+
+            const baseCurr = document.getElementById('baseCurrency').value;
+            const targetCurr = document.getElementById('targetCurrency').value;
+
+            // Update UI Labels
+            document.getElementById('spotLabel').innerText = `Spot Gold Price (${baseCurr} / oz)`;
+            document.getElementById('spotSymbol').innerText = currencySymbols[baseCurr] || '$';
+            document.getElementById('sarFxLabel').innerText = `${baseCurr} to SAR Exchange Rate`;
+            document.getElementById('targetFxLabel').innerText = `${baseCurr} to ${targetCurr} Rate`;
+            document.getElementById('targetTableHeader').innerText = `Equiv. ${targetCurr} (Tourist)`;
+            document.getElementById('customTargetTitle').innerText = `Equivalent Tourist Net (${targetCurr})`;
+            
+            document.querySelectorAll('.targetCurrencyLabel').forEach(el => el.innerText = targetCurr);
+
+            // 1. Fetch Spot Gold Price in selected Base Currency
+            try {
+                const goldRes = await fetch(`https://api.gold-api.com/price/XAU`);
+                const goldData = await goldRes.json();
+                
+                if (goldData && goldData.price) {
+                    let basePrice = parseFloat(goldData.price);
+                    
+                    // Convert USD base gold price to chosen base currency if non-USD
+                    if (baseCurr !== 'USD') {
+                        const fxRes = await fetch(`https://open.er-api.com/v6/latest/USD`);
+                        const fxData = await fxRes.json();
+                        if (fxData && fxData.rates && fxData.rates[baseCurr]) {
+                            basePrice = basePrice * fxData.rates[baseCurr];
+                        }
+                    }
+
+                    document.getElementById('spotPrice').value = basePrice.toFixed(2);
+                    goldBadge.innerText = '● Live Data';
+                    goldBadge.className = 'text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200';
+                }
+            } catch (err) {
+                console.warn('Gold API error', err);
+                goldBadge.innerText = '● Manual';
+                goldBadge.className = 'text-[10px] font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200';
+            }
+
+            // 2. Fetch Live FX Rates relative to selected Base Currency
+            try {
+                const fxRes = await fetch(`https://open.er-api.com/v6/latest/${baseCurr}`);
+                const fxData = await fxRes.json();
+                
+                if (fxData && fxData.rates) {
+                    if (fxData.rates.SAR) {
+                        document.getElementById('baseToSar').value = parseFloat(fxData.rates.SAR).toFixed(4);
+                        sarFxBadge.innerText = '● Live FX';
+                        sarFxBadge.className = 'text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200';
+                    }
+                    if (fxData.rates[targetCurr]) {
+                        document.getElementById('baseToTarget').value = parseFloat(fxData.rates[targetCurr]).toFixed(2);
+                        targetFxBadge.innerText = '● Live FX';
+                        targetFxBadge.className = 'text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200';
+                    }
+                }
+            } catch (err) {
+                console.warn('FX API error', err);
+                sarFxBadge.innerText = '● Manual';
+                sarFxBadge.className = 'text-[10px] font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200';
+                targetFxBadge.innerText = '● Manual';
+                targetFxBadge.className = 'text-[10px] font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200';
+            }
+
+            refreshIcon.classList.remove('animate-spin');
+            updateTimestamp();
+            calculateAll();
+        }
+
+        function calculateAll() {
+            const spotPrice = parseFloat(document.getElementById('spotPrice').value) || 0;
+            const baseToSar = parseFloat(document.getElementById('baseToSar').value) || 0;
+            const baseToTarget = parseFloat(document.getElementById('baseToTarget').value) || 0;
+            const makingCharge = parseFloat(document.getElementById('makingCharge').value) || 0;
+            const vatRate = (parseFloat(document.getElementById('vatRate').value) || 0) / 100;
+            const refundRate = (parseFloat(document.getElementById('refundRate').value) || 0) / 100;
+
+            const targetCurr = document.getElementById('targetCurrency').value;
+            const targetSymbol = currencySymbols[targetCurr] || targetCurr;
+
+            // Base 24K Gold Price per Gram in SAR
+            const base24kSarPerGram = (spotPrice * baseToSar) / GRAMS_PER_OZ;
+
+            function getPrice(purity, isTourist, grams) {
+                const purityRatio = purity / 24;
+                const costPerGram = (base24kSarPerGram * purityRatio) + makingCharge;
+                const finalTaxMultiplier = isTourist ? (1 + vatRate - (vatRate * refundRate)) : (1 + vatRate);
+                return costPerGram * finalTaxMultiplier * grams;
+            }
+
+            // Calculations 22K
+            const bhori22_std = getPrice(22, false, GRAMS_PER_BHORI);
+            const bhori22_tour = getPrice(22, true, GRAMS_PER_BHORI);
+            const bhori22_target = (bhori22_tour / baseToSar) * baseToTarget;
+
+            const ana22_std = getPrice(22, false, GRAMS_PER_BHORI / ANAS_PER_BHORI);
+            const ana22_tour = getPrice(22, true, GRAMS_PER_BHORI / ANAS_PER_BHORI);
+            const ana22_target = (ana22_tour / baseToSar) * baseToTarget;
+
+            // Calculations 21K
+            const bhori21_std = getPrice(21, false, GRAMS_PER_BHORI);
+            const bhori21_tour = getPrice(21, true, GRAMS_PER_BHORI);
+            const bhori21_target = (bhori21_tour / baseToSar) * baseToTarget;
+
+            const ana21_std = getPrice(21, false, GRAMS_PER_BHORI / ANAS_PER_BHORI);
+            const ana21_tour = getPrice(21, true, GRAMS_PER_BHORI / ANAS_PER_BHORI);
+            const ana21_target = (ana21_tour / baseToSar) * baseToTarget;
+
+            // Render Standard Table Results
+            document.getElementById('std_22_bhori').innerText = `SR ${bhori22_std.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+            document.getElementById('tour_22_bhori').innerText = `SR ${bhori22_tour.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+            document.getElementById('target_22_bhori').innerText = `${targetSymbol} ${bhori22_target.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+
+            document.getElementById('std_22_ana').innerText = `SR ${ana22_std.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+            document.getElementById('tour_22_ana').innerText = `SR ${ana22_tour.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+            document.getElementById('target_22_ana').innerText = `${targetSymbol} ${ana22_target.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+
+            document.getElementById('std_21_bhori').innerText = `SR ${bhori21_std.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+            document.getElementById('tour_21_bhori').innerText = `SR ${bhori21_tour.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+            document.getElementById('target_21_bhori').innerText = `${targetSymbol} ${bhori21_target.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+
+            document.getElementById('std_21_ana').innerText = `SR ${ana21_std.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+            document.getElementById('tour_21_ana').innerText = `SR ${ana21_tour.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+            document.getElementById('target_21_ana').innerText = `${targetSymbol} ${ana21_target.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+
+            // Custom Calculator
+            const customPurity = parseInt(document.getElementById('customPurity').value) || 22;
+            const customBhori = parseFloat(document.getElementById('customBhori').value) || 0;
+            const customAna = parseFloat(document.getElementById('customAna').value) || 0;
+            const customGrams = parseFloat(document.getElementById('customGrams').value) || 0;
+
+            const calculatedCustomGrams = (customBhori * GRAMS_PER_BHORI) + ((customAna * GRAMS_PER_BHORI) / ANAS_PER_BHORI) + customGrams;
+
+            const customStdPrice = getPrice(customPurity, false, calculatedCustomGrams);
+            const customTourPrice = getPrice(customPurity, true, calculatedCustomGrams);
+            const customTargetPrice = (customTourPrice / baseToSar) * baseToTarget;
+
+            document.getElementById('custom_weight_grams').innerText = `${calculatedCustomGrams.toFixed(3)} g`;
+            document.getElementById('custom_std_price').innerText = `SR ${customStdPrice.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+            document.getElementById('custom_tour_price').innerText = `SR ${customTourPrice.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+            document.getElementById('custom_target_price').innerText = `${targetSymbol} ${customTargetPrice.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+        }
+
+        function exportToExcel() {
+            const baseCurr = document.getElementById('baseCurrency').value;
+            const targetCurr = document.getElementById('targetCurrency').value;
+            const spot = parseFloat(document.getElementById('spotPrice').value) || 0;
+            const baseToSar = parseFloat(document.getElementById('baseToSar').value) || 0;
+            const baseToTarget = parseFloat(document.getElementById('baseToTarget').value) || 0;
+
+            const sheetData = [
+                ["Multi-Currency Gold Price Calculator"],
+                [],
+                ["1. Market Inputs & Selected Pair"],
+                [`Spot Gold Price (${baseCurr})`, spot],
+                [`${baseCurr} to SAR Exchange Rate`, baseToSar],
+                [`${baseCurr} to ${targetCurr} Exchange Rate`, baseToTarget],
+                [],
+                ["2. Unit Conversions"],
+                ["Grams per Troy Ounce", GRAMS_PER_OZ],
+                ["Grams per Bhori (Vori)", GRAMS_PER_BHORI],
+                ["Anas per Bhori", ANAS_PER_BHORI]
+            ];
+
+            const wb = XLSX.utils.book_new();
+            const ws = XLSX.utils.aoa_to_sheet(sheetData);
+            XLSX.utils.book_append_sheet(wb, ws, "Gold Price Calculator");
+            XLSX.writeFile(wb, `Gold_Calculator_${baseCurr}_${targetCurr}.xlsx`);
+        }
+
+        window.onload = function() {
+            lucide.createIcons();
+            updateTimestamp();
+            fetchLiveMarketData();
+        }
+    </script>
+</body>
+</html>
