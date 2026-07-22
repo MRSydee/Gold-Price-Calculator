@@ -1,0 +1,12 @@
+{
+  "background_color": "#ffffff",
+  "dir": "ltr",
+  "display": "standalone",
+  "name": "Gold Price Calculator",
+  "orientation": "any",
+  "scope": "/",
+  "short_name": "Gold Calc",
+  "start_url": "//Gold-Price-Calculator/",
+  "theme_color": "#ffffff",
+  "description": "Multi-Currency Gold Price &amp; KSA Retail Rate Calculator"
+}
